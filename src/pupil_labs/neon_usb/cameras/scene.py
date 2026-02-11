@@ -5,9 +5,9 @@ import numpy as np
 
 from pupil_labs.neon_usb.cameras.backend import UVCBackend, V4l2Backend
 from pupil_labs.neon_usb.cameras.camera import Camera, CameraSpec
-from pupil_labs.neon_usb.usb_utils import get_calibration
-from pupil_labs.neon_usb.pyrav4l2.controls import Menu
 from pupil_labs.neon_usb.frame import Frame
+from pupil_labs.neon_usb.pyrav4l2.controls import Menu
+from pupil_labs.neon_usb.usb_utils import get_calibration
 
 
 class SceneIntrinsics(NamedTuple):
@@ -117,18 +117,18 @@ class SceneCameraV4l2(Camera):
         # Build a dictionary of V4L2 controls by name for easy access
         self.v4l2_controls = {ctrl.name: ctrl for ctrl in self.backend.device.controls}
 
-        # Set default camera parameters similar to UVC version (v4l2-ctl -d /dev/videoX -l)
+        # Set default camera parameters similar to UVC version
         default_params = {
-            "brightness": 0,
-            "contrast": 32,
-            "saturation": 64,
-            "hue": 0,
-            "gamma": 300,
-            "gain": 64,
-            "sharpness": 50,
-            "backlight_compensation": 2,
-            "auto_exposure": 1,  # Manual mode
-            "exposure_time_absolute": 250,
+            "Brightness": 0,
+            "Contrast": 32,
+            "Saturation": 64,
+            "Hue": 0,
+            "Gamma": 300,
+            "Gain": 64,
+            "Sharpness": 50,
+            "Backlight Compensation": 2,
+            "Auto Exposure": 1,  # Manual mode (menu index 1)
+            "Exposure Time, Absolute": 250,
         }
         for key, value in default_params.items():
             try:
@@ -173,7 +173,7 @@ class SceneCameraV4l2(Camera):
     @property
     def exposure(self) -> int:
         """Get current exposure time."""
-        control_name = "exposure_time_absolute"
+        control_name = "Exposure Time, Absolute"
         if control_name in self.v4l2_controls:
             value = self.backend.device.get_control_value(self.v4l2_controls[control_name])
             assert isinstance(value, int)
@@ -184,5 +184,5 @@ class SceneCameraV4l2(Camera):
     def exposure(self, value: int) -> None:
         """Set exposure time (manual mode)."""
         # Ensure we're in manual exposure mode (menu index 1 = Manual Mode)
-        self._set_v4l2_control("auto_exposure", 1)
-        self._set_v4l2_control("exposure_time_absolute", value)
+        self._set_v4l2_control("Auto Exposure", 1)
+        self._set_v4l2_control("Exposure Time, Absolute", value)
