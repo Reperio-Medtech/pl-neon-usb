@@ -71,10 +71,15 @@ class SceneCamera(Camera):
         self._v4l2_auto_exposure_control: Control | None = None
         if isinstance(self.backend, V4l2Backend):
             self._v4l2_exposure_control = self._find_v4l2_control(
-                ("Exposure (Absolute)", "Exposure, Absolute", "Exposure Absolute")
+                (
+                    "Exposure (Absolute)",
+                    "Exposure, Absolute",
+                    "Exposure Absolute",
+                    "exposure_time_absolute",
+                )
             )
             self._v4l2_auto_exposure_control = self._find_v4l2_control(
-                ("Exposure, Auto", "Exposure Auto")
+                ("Exposure, Auto", "Exposure Auto", "auto_exposure")
             )
             self._configure_v4l2_exposure_defaults()
 
@@ -124,13 +129,16 @@ class SceneCamera(Camera):
     def _find_v4l2_control(self, names: tuple[str, ...]) -> Control | None:
         if not isinstance(self.backend, V4l2Backend):
             return None
-        names_cf = {name.casefold() for name in names}
+        def _norm(value: str) -> str:
+            return value.casefold().replace(" ", "_").replace(",", "_")
+
+        names_cf = {_norm(name) for name in names}
         for ctrl in self.backend.device.controls:
-            if ctrl.name.casefold() in names_cf:
+            if _norm(ctrl.name) in names_cf:
                 return ctrl
         for ctrl in self.backend.device.controls:
             for name in names_cf:
-                if name in ctrl.name.casefold():
+                if name in _norm(ctrl.name):
                     return ctrl
         return None
 
