@@ -35,7 +35,7 @@ NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
     width=1600,
     height=1200,
     fps=30,
-    bandwidth_factor=0,  # Not used in V4L2 backend
+    bandwidth_factor=0.6,
 )
 
 
