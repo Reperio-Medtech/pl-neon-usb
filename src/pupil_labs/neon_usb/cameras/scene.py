@@ -1,3 +1,4 @@
+import time
 from typing import NamedTuple
 
 import numpy as np
@@ -5,7 +6,8 @@ import numpy as np
 from pupil_labs.neon_usb.cameras.backend import UVCBackend, V4l2Backend
 from pupil_labs.neon_usb.cameras.camera import Camera, CameraSpec
 from pupil_labs.neon_usb.usb_utils import get_calibration
-from pupil_labs.neon_usb.pyrav4l2.controls import Menu, MenuItem, IntegerMenuItem, Control
+from pupil_labs.neon_usb.pyrav4l2.controls import Menu
+from pupil_labs.neon_usb.frame import Frame
 
 
 class SceneIntrinsics(NamedTuple):
@@ -25,6 +27,18 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
 )
 
 
+# V4L2 spec for scene camera
+NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
+    name="Neon Scene Camera v1",
+    vendor_id=0x0BDA,
+    product_id=0x3036,
+    width=1600,
+    height=1200,
+    fps=30,
+    bandwidth_factor=0,  # Not used in V4L2 backend
+)
+
+
 class SceneCamera(Camera):
     """Provides an interface for handling the Neon scene camera.
 
@@ -32,56 +46,35 @@ class SceneCamera(Camera):
     computer at the same time.
     """
 
-    def __init__(
-        self,
-        spec: CameraSpec = NEON_SCENE_CAMERA_SPEC,
-        backend_class: type[UVCBackend | V4l2Backend] = UVCBackend,
-    ) -> None:
+    def __init__(self, spec: CameraSpec = NEON_SCENE_CAMERA_SPEC) -> None:
         """Initialize the scene camera of the connected Neon device.
 
         The camera stream will be started right away. If the object fails to grab
         frames, it will automatically try to reinitialize.
         """
-        super().__init__(spec, backend_class)
+        super().__init__(NEON_SCENE_CAMERA_SPEC, UVCBackend)
 
-        self.uvc_controls = None
-        if isinstance(self.backend, UVCBackend):
-            self.uvc_controls = {
-                c.display_name: c for c in self.backend._uvc_capture.controls
-            }
-            camera_parameters = {
-                "Backlight Compensation": 2,
-                "Brightness": 0,
-                "Contrast": 32,
-                "Gain": 64,
-                "Hue": 0,
-                "Saturation": 64,
-                "Sharpness": 50,
-                "Gamma": 300,
-                "Auto Exposure Mode": 1,
-                "Absolute Exposure Time": 250,
-            }
-            for key, value in camera_parameters.items():
-                try:
-                    self.uvc_controls[key].value = value
-                except KeyError:
-                    print(f"Setting {key} to {value} failed: Unknown control. Known ")
-
-        self._v4l2_exposure_control: Control | None = None
-        self._v4l2_auto_exposure_control: Control | None = None
-        if isinstance(self.backend, V4l2Backend):
-            self._v4l2_exposure_control = self._find_v4l2_control(
-                (
-                    "Exposure (Absolute)",
-                    "Exposure, Absolute",
-                    "Exposure Absolute",
-                    "exposure_time_absolute",
-                )
-            )
-            self._v4l2_auto_exposure_control = self._find_v4l2_control(
-                ("Exposure, Auto", "Exposure Auto", "auto_exposure")
-            )
-            self._configure_v4l2_exposure_defaults()
+        assert isinstance(self.backend, UVCBackend)
+        self.uvc_controls = {
+            c.display_name: c for c in self.backend._uvc_capture.controls
+        }
+        camera_parameters = {
+            "Backlight Compensation": 2,
+            "Brightness": 0,
+            "Contrast": 32,
+            "Gain": 64,
+            "Hue": 0,
+            "Saturation": 64,
+            "Sharpness": 50,
+            "Gamma": 300,
+            "Auto Exposure Mode": 1,
+            "Absolute Exposure Time": 250,
+        }
+        for key, value in camera_parameters.items():
+            try:
+                self.uvc_controls[key].value = value
+            except KeyError:
+                print(f"Setting {key} to {value} failed: Unknown control. Known ")
 
     @staticmethod
     def get_intrinsics() -> SceneIntrinsics:
@@ -100,84 +93,96 @@ class SceneCamera(Camera):
 
     @property
     def exposure(self) -> int:
-        if isinstance(self.backend, UVCBackend):
-            assert self.uvc_controls is not None
-            value = self.uvc_controls["Absolute Exposure Time"].value
-            assert isinstance(value, int)
-            return value
-        if isinstance(self.backend, V4l2Backend):
-            if self._v4l2_exposure_control is None:
-                raise RuntimeError("V4L2 exposure control not available.")
-            value = self.backend.device.get_control_value(self._v4l2_exposure_control)
-            assert isinstance(value, int)
-            return value
-        raise RuntimeError("Unsupported backend for exposure control.")
+        value = self.uvc_controls["Absolute Exposure Time"].value
+        assert isinstance(value, int)
+        return value
 
     @exposure.setter
     def exposure(self, value: int) -> None:
-        if isinstance(self.backend, UVCBackend):
-            assert self.uvc_controls is not None
-            self.uvc_controls["Absolute Exposure Time"].value = value
-            return
-        if isinstance(self.backend, V4l2Backend):
-            if self._v4l2_exposure_control is None:
-                raise RuntimeError("V4L2 exposure control not available.")
-            self.backend.device.set_control_value(self._v4l2_exposure_control, value)
-            return
-        raise RuntimeError("Unsupported backend for exposure control.")
-
-    def _find_v4l2_control(self, names: tuple[str, ...]) -> Control | None:
-        if not isinstance(self.backend, V4l2Backend):
-            return None
-        def _norm(value: str) -> str:
-            return value.casefold().replace(" ", "_").replace(",", "_")
-
-        names_cf = {_norm(name) for name in names}
-        for ctrl in self.backend.device.controls:
-            if _norm(ctrl.name) in names_cf:
-                return ctrl
-        for ctrl in self.backend.device.controls:
-            for name in names_cf:
-                if name in _norm(ctrl.name):
-                    return ctrl
-        return None
-
-    def _configure_v4l2_exposure_defaults(self) -> None:
-        if not isinstance(self.backend, V4l2Backend):
-            return
-        if self._v4l2_auto_exposure_control is not None:
-            auto_ctrl = self._v4l2_auto_exposure_control
-            if isinstance(auto_ctrl, Menu):
-                self._set_v4l2_menu_value(auto_ctrl, ("manual",))
-            else:
-                try:
-                    self.backend.device.set_control_value(auto_ctrl, 1)
-                except Exception:
-                    pass
-        if self._v4l2_exposure_control is not None:
-            try:
-                self.backend.device.set_control_value(self._v4l2_exposure_control, 250)
-            except Exception:
-                pass
-
-    def _set_v4l2_menu_value(self, control: Menu, keywords: tuple[str, ...]) -> None:
-        keywords_cf = tuple(k.casefold() for k in keywords)
-        for item in control.items:
-            name = ""
-            if isinstance(item, MenuItem):
-                name = item.name
-            elif isinstance(item, IntegerMenuItem):
-                name = str(item.value)
-            if any(k in name.casefold() for k in keywords_cf):
-                self.backend.device.set_control_value(control, item)
-                return
+        self.uvc_controls["Absolute Exposure Time"].value = value
 
 
-class SceneCameraUVC(SceneCamera):
-    def __init__(self, spec: CameraSpec = NEON_SCENE_CAMERA_SPEC) -> None:
-        super().__init__(spec, UVCBackend)
+class SceneCameraV4l2(Camera):
+    """Scene camera using V4L2 backend with software timestamps.
 
+    Uses software timestamps instead of hardware timestamps to avoid visual artifacts.
+    Provides manual exposure control through V4L2 controls.
+    """
 
-class SceneCameraV4l2(SceneCamera):
-    def __init__(self, spec: CameraSpec = NEON_SCENE_CAMERA_SPEC) -> None:
+    def __init__(self, spec: CameraSpec = NEON_SCENE_CAMERA_V4L2_SPEC) -> None:
+        
         super().__init__(spec, V4l2Backend)
+
+        assert isinstance(self.backend, V4l2Backend)
+        # Build a dictionary of V4L2 controls by name for easy access
+        self.v4l2_controls = {ctrl.name: ctrl for ctrl in self.backend.device.controls}
+
+        # Set default camera parameters similar to UVC version (v4l2-ctl -d /dev/videoX -l)
+        default_params = {
+            "brightness": 0,
+            "contrast": 32,
+            "saturation": 64,
+            "hue": 0,
+            "gamma": 300,
+            "gain": 64,
+            "sharpness": 50,
+            "backlight_compensation": 2,
+            "auto_exposure": 1,  # Manual mode
+            "exposure_time_absolute": 250,
+        }
+        for key, value in default_params.items():
+            try:
+                self._set_v4l2_control(key, value)
+            except Exception as e:
+                print(f"Setting {key} to {value} failed: {e}")
+
+    def _set_v4l2_control(self, name: str, value: int) -> None:
+        """Set a V4L2 control by name, handling both menu and integer controls."""
+        if name not in self.v4l2_controls:
+            return
+        control = self.v4l2_controls[name]
+        if isinstance(control, Menu):
+            # For menu controls, find the item matching the requested index
+            item = next((i for i in control.items if i.index == value), None)
+            if item is not None:
+                self.backend.device.set_control_value(control, item)
+        else:
+            self.backend.device.set_control_value(control, value)
+
+    def get_frame(self) -> Frame:
+        """Get a frame using software timestamps instead of hardware timestamps."""
+        frame = super().get_frame()
+        # Replace hardware timestamp with software timestamp to avoid visual artifacts
+        return Frame(frame.img, time.time(), frame.index)
+
+    @staticmethod
+    def get_intrinsics() -> SceneIntrinsics:
+        """Retrieve the scene camera intrinsics of the Neon device
+
+        Returns:
+            Tuple containing camera matrix and distortion coefficients of scene camera.
+
+        """
+        calib_data = get_calibration()
+        return SceneIntrinsics(
+            calib_data.scene_camera_matrix,
+            calib_data.scene_distortion_coefficients,
+            calib_data.scene_extrinsics_affine_matrix,
+        )
+
+    @property
+    def exposure(self) -> int:
+        """Get current exposure time."""
+        control_name = "exposure_time_absolute"
+        if control_name in self.v4l2_controls:
+            value = self.backend.device.get_control_value(self.v4l2_controls[control_name])
+            assert isinstance(value, int)
+            return value
+        raise AttributeError("Exposure control not available")
+
+    @exposure.setter
+    def exposure(self, value: int) -> None:
+        """Set exposure time (manual mode)."""
+        # Ensure we're in manual exposure mode (menu index 1 = Manual Mode)
+        self._set_v4l2_control("auto_exposure", 1)
+        self._set_v4l2_control("exposure_time_absolute", value)
