@@ -32,8 +32,8 @@ NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
     name="Neon Scene Camera v1",
     vendor_id=0x0BDA,
     product_id=0x3036,
-    width=800,
-    height=600,
+    width=1600,
+    height=1200,
     fps=30,
     bandwidth_factor=0.8,
 )
