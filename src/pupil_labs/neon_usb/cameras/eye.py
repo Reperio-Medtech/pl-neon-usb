@@ -18,7 +18,7 @@ NEON_EYE_CAMERA_SPEC = CameraSpec(
     width=384,
     height=192,
     fps=200,
-    bandwidth_factor=1.2,
+    bandwidth_factor=0,
 )
 
 
@@ -53,6 +53,8 @@ class Exposure_Time:
             self.last_check_timestamp = timestamp
 
         if timestamp - self.last_check_timestamp > self.check_freq:
+            self.last_check_timestamp = timestamp  # reset so we wait before next check
+
             if self.mode == "manual":
                 self.last_ETs = [self.ET_thres[1]] * 2
                 return [self.ET_thres[1]] * 2
