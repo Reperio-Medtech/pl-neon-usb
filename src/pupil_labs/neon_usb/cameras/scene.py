@@ -23,7 +23,7 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
     width=1600,
     height=1200,
     fps=30,
-    bandwidth_factor=0.8,
+    bandwidth_factor=1.2,
 )
 
 
@@ -34,7 +34,7 @@ NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
     product_id=0x3036,
     width=800,
     height=600,
-    fps=10,
+    fps=30,
     bandwidth_factor=0.8,
 )
 
