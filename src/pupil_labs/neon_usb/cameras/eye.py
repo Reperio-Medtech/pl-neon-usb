@@ -18,7 +18,7 @@ NEON_EYE_CAMERA_SPEC = CameraSpec(
     width=384,
     height=192,
     fps=200,
-    bandwidth_factor=0,
+    bandwidth_factor=1.2,
 )
 
 
