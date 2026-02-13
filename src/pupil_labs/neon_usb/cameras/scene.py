@@ -21,10 +21,10 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
     name="Neon Scene Camera v1",
     vendor_id=0x0BDA,
     product_id=0x3036,
-    width=1600,
-    height=1200,
-    fps=30,
-    bandwidth_factor=float(os.getenv("NEON_SCENE_UVC_BW_FACTOR", "0.8")),
+    width=int(os.getenv("NEON_SCENE_UVC_WIDTH", "1920")),
+    height=int(os.getenv("NEON_SCENE_UVC_HEIGHT", "1080")),
+    fps=int(os.getenv("NEON_SCENE_UVC_FPS", "30")),
+    bandwidth_factor=float(os.getenv("NEON_SCENE_UVC_BW_FACTOR", "0.6")),
 )
 
 
