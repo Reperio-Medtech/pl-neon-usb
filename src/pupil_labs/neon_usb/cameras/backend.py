@@ -102,6 +102,7 @@ class V4l2Backend(CameraBackend):
         self.camera_reinit_timeout = 3
         self.device = None
         self.frame_counter = -1
+        self._stream_started = False
 
         errors = {}
         for device_path in Path("/dev/").glob("video*"):
@@ -141,13 +142,17 @@ class V4l2Backend(CameraBackend):
                         device.set_format(color_format, frame_size)
                         device.set_frame_interval(frame_interval)
                         self.device = device
+                        # Prepare the stream (allocate buffers) but do NOT
+                        # call VIDIOC_STREAMON yet — that claims isochronous
+                        # bandwidth from the USB host controller.  We defer
+                        # it to start_stream() / first get_frame() so that
+                        # another camera (eye UVC) can claim its share first.
                         self.stream = V4lStream(self.device)
-                        self.stream.open()
                         self._fd = open(self.device.path)  # noqa: SIM115
                         self.color_format, _ = self.device.get_format()
                         print(f"[V4L2] Matched: {color_format} "
                               f"{frame_size.width}x{frame_size.height} "
-                              f"@ {fps:.0f}fps")
+                              f"@ {fps:.0f}fps  (stream deferred)")
                         break
 
                 else:
@@ -161,7 +166,23 @@ class V4l2Backend(CameraBackend):
         if self.device is None:
             raise CameraNotFoundError(self.spec.name)
 
+    def start_stream(self) -> None:
+        """Explicitly start the V4L2 stream (VIDIOC_STREAMON).
+
+        Call this AFTER any other camera backends that share the same USB bus
+        have already claimed their bandwidth (e.g. eye camera UVC).
+        """
+        if not self._stream_started:
+            print("[V4L2] Starting stream (VIDIOC_STREAMON)...")
+            self.stream.open()
+            self._stream_started = True
+            print("[V4L2] Stream started.")
+
     def get_frame(self) -> Frame:
+        # Lazy start: if start_stream() was not called explicitly, start now.
+        if not self._stream_started:
+            self.start_stream()
+
         buffer, time_ns = self.stream.get_frame()
         if buffer is None:
             raise TimeoutError
