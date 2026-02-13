@@ -120,6 +120,17 @@ class V4l2Backend(CameraBackend):
                         color_format, frame_size
                     )
                 ]
+
+                # Log all available modes for diagnostics
+                print(f"[V4L2] Available modes for '{device.device_name}' "
+                      f"({device.path}):")
+                for cf, fs, fi in formats:
+                    fps_avail = (fi.denominator / fi.numerator
+                                 if fi.numerator else 0)
+                    print(f"  {cf} {fs.width}x{fs.height} @ {fps_avail:.0f}fps")
+                print(f"[V4L2] Requested: {self.spec.width}x{self.spec.height} "
+                      f"@ {self.spec.fps}fps")
+
                 for color_format, frame_size, frame_interval in formats:
                     fps = frame_interval.denominator / frame_interval.numerator
                     if (frame_size.width, frame_size.height, fps) == (
@@ -134,11 +145,18 @@ class V4l2Backend(CameraBackend):
                         self.stream.open()
                         self._fd = open(self.device.path)  # noqa: SIM115
                         self.color_format, _ = self.device.get_format()
-
+                        print(f"[V4L2] Matched: {color_format} "
+                              f"{frame_size.width}x{frame_size.height} "
+                              f"@ {fps:.0f}fps")
                         break
 
                 else:
-                    raise OSError("None of the available modes matched!")
+                    raise OSError(
+                        f"None of the available modes matched the requested "
+                        f"{self.spec.width}x{self.spec.height}@{self.spec.fps}fps! "
+                        f"Set NEON_SCENE_V4L2_WIDTH / HEIGHT / FPS env vars to "
+                        f"one of the modes listed above."
+                    )
 
         if self.device is None:
             raise CameraNotFoundError(self.spec.name)

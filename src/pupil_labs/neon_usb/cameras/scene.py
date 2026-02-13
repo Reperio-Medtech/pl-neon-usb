@@ -1,3 +1,4 @@
+import os
 import time
 from typing import NamedTuple
 
@@ -26,15 +27,22 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
     bandwidth_factor=1.2,
 )
 
+# V4L2 spec for scene camera — resolution/fps configurable via env vars
+# to allow experimenting with lower bandwidth modes.
+#   NEON_SCENE_V4L2_WIDTH   (default: 800)
+#   NEON_SCENE_V4L2_HEIGHT  (default: 600)
+#   NEON_SCENE_V4L2_FPS     (default: 30)
+_v4l2_width = int(os.getenv("NEON_SCENE_V4L2_WIDTH", "800"))
+_v4l2_height = int(os.getenv("NEON_SCENE_V4L2_HEIGHT", "600"))
+_v4l2_fps = int(os.getenv("NEON_SCENE_V4L2_FPS", "30"))
 
-# V4L2 spec for scene camera
 NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
     name="Neon Scene Camera v1",
     vendor_id=0x0BDA,
     product_id=0x3036,
-    width=1600,
-    height=1200,
-    fps=30,
+    width=_v4l2_width,
+    height=_v4l2_height,
+    fps=_v4l2_fps,
     bandwidth_factor=0.8,
 )
 
@@ -101,13 +109,8 @@ class SceneCamera(Camera):
     def exposure(self, value: int) -> None:
         self.uvc_controls["Absolute Exposure Time"].value = value
 
-
 class SceneCameraV4l2(Camera):
-    """Scene camera using V4L2 backend with software timestamps.
-
-    Uses software timestamps instead of hardware timestamps to avoid visual artifacts.
-    Provides manual exposure control through V4L2 controls.
-    """
+    """Scene camera using V4L2 backend"""
 
     def __init__(self, spec: CameraSpec = NEON_SCENE_CAMERA_V4L2_SPEC) -> None:
         
