@@ -32,8 +32,8 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
 #   NEON_SCENE_V4L2_WIDTH   (default: 800)
 #   NEON_SCENE_V4L2_HEIGHT  (default: 600)
 #   NEON_SCENE_V4L2_FPS     (default: 30)
-_v4l2_width = int(os.getenv("NEON_SCENE_V4L2_WIDTH", "800"))
-_v4l2_height = int(os.getenv("NEON_SCENE_V4L2_HEIGHT", "600"))
+_v4l2_width = int(os.getenv("NEON_SCENE_V4L2_WIDTH", "640"))
+_v4l2_height = int(os.getenv("NEON_SCENE_V4L2_HEIGHT", "480"))
 _v4l2_fps = int(os.getenv("NEON_SCENE_V4L2_FPS", "30"))
 
 NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
