@@ -102,7 +102,6 @@ class V4l2Backend(CameraBackend):
         self.camera_reinit_timeout = 3
         self.device = None
         self.frame_counter = -1
-        self._stream_started = False
 
         errors = {}
         for device_path in Path("/dev/").glob("video*"):
@@ -121,17 +120,6 @@ class V4l2Backend(CameraBackend):
                         color_format, frame_size
                     )
                 ]
-
-                # Log all available modes for diagnostics
-                print(f"[V4L2] Available modes for '{device.device_name}' "
-                      f"({device.path}):")
-                for cf, fs, fi in formats:
-                    fps_avail = (fi.denominator / fi.numerator
-                                 if fi.numerator else 0)
-                    print(f"  {cf} {fs.width}x{fs.height} @ {fps_avail:.0f}fps")
-                print(f"[V4L2] Requested: {self.spec.width}x{self.spec.height} "
-                      f"@ {self.spec.fps}fps")
-
                 for color_format, frame_size, frame_interval in formats:
                     fps = frame_interval.denominator / frame_interval.numerator
                     if (frame_size.width, frame_size.height, fps) == (
@@ -142,47 +130,20 @@ class V4l2Backend(CameraBackend):
                         device.set_format(color_format, frame_size)
                         device.set_frame_interval(frame_interval)
                         self.device = device
-                        # Prepare the stream (allocate buffers) but do NOT
-                        # call VIDIOC_STREAMON yet — that claims isochronous
-                        # bandwidth from the USB host controller.  We defer
-                        # it to start_stream() / first get_frame() so that
-                        # another camera (eye UVC) can claim its share first.
                         self.stream = V4lStream(self.device)
+                        self.stream.open()
                         self._fd = open(self.device.path)  # noqa: SIM115
                         self.color_format, _ = self.device.get_format()
-                        print(f"[V4L2] Matched: {color_format} "
-                              f"{frame_size.width}x{frame_size.height} "
-                              f"@ {fps:.0f}fps  (stream deferred)")
+
                         break
 
                 else:
-                    raise OSError(
-                        f"None of the available modes matched the requested "
-                        f"{self.spec.width}x{self.spec.height}@{self.spec.fps}fps! "
-                        f"Set NEON_SCENE_V4L2_WIDTH / HEIGHT / FPS env vars to "
-                        f"one of the modes listed above."
-                    )
+                    raise OSError("None of the available modes matched!")
 
         if self.device is None:
             raise CameraNotFoundError(self.spec.name)
 
-    def start_stream(self) -> None:
-        """Explicitly start the V4L2 stream (VIDIOC_STREAMON).
-
-        Call this AFTER any other camera backends that share the same USB bus
-        have already claimed their bandwidth (e.g. eye camera UVC).
-        """
-        if not self._stream_started:
-            print("[V4L2] Starting stream (VIDIOC_STREAMON)...")
-            self.stream.open()
-            self._stream_started = True
-            print("[V4L2] Stream started.")
-
     def get_frame(self) -> Frame:
-        # Lazy start: if start_stream() was not called explicitly, start now.
-        if not self._stream_started:
-            self.start_stream()
-
         buffer, time_ns = self.stream.get_frame()
         if buffer is None:
             raise TimeoutError

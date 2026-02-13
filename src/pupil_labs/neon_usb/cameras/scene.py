@@ -1,4 +1,3 @@
-import os
 import time
 from typing import NamedTuple
 
@@ -27,25 +26,15 @@ NEON_SCENE_CAMERA_SPEC = CameraSpec(
     bandwidth_factor=1.2,
 )
 
-# V4L2 spec for scene camera — resolution/fps configurable via env vars
-# to allow experimenting with different bandwidth modes.
-# Default is 640x480 (lowest available MJPEG mode) to minimise the
-# isochronous bandwidth the kernel claims, leaving room for the eye
-# camera UVC stream on the shared USB 2.0 bus.
-#   NEON_SCENE_V4L2_WIDTH   (default: 640)
-#   NEON_SCENE_V4L2_HEIGHT  (default: 480)
-#   NEON_SCENE_V4L2_FPS     (default: 30)
-_v4l2_width = int(os.getenv("NEON_SCENE_V4L2_WIDTH", "640"))
-_v4l2_height = int(os.getenv("NEON_SCENE_V4L2_HEIGHT", "480"))
-_v4l2_fps = int(os.getenv("NEON_SCENE_V4L2_FPS", "30"))
 
+# V4L2 spec for scene camera
 NEON_SCENE_CAMERA_V4L2_SPEC = CameraSpec(
     name="Neon Scene Camera v1",
     vendor_id=0x0BDA,
     product_id=0x3036,
-    width=_v4l2_width,
-    height=_v4l2_height,
-    fps=_v4l2_fps,
+    width=1600,
+    height=1200,
+    fps=30,
     bandwidth_factor=0.8,
 )
 
