@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from pupil_labs.neon_usb import uvc_utils
-from pupil_labs.neon_usb.cameras.backend import UVCBackend, V4l2Backend
+from pupil_labs.neon_usb.cameras.backend import CameraBackend, UVCBackend, V4l2Backend
 from pupil_labs.neon_usb.cameras.camera import Camera, CameraSpec, Frame
 from pupil_labs.neon_usb.usb_utils import USB_ID_PRODUCT, USB_ID_VENDOR
 
@@ -105,7 +105,9 @@ class EyeCamera(Camera):
     """
 
     def __init__(
-        self, spec: CameraSpec = NEON_EYE_CAMERA_SPEC, backend_class=None
+        self,
+        spec: CameraSpec = NEON_EYE_CAMERA_SPEC,
+        backend_class: type[CameraBackend] | None = None,
     ) -> None:
         """Initialize the eye cameras of the connected Neon device.
 
@@ -158,6 +160,7 @@ class EyeCamera(Camera):
 class EyeCameraUVC(EyeCamera):
     def __init__(self, spec: CameraSpec = NEON_EYE_CAMERA_SPEC) -> None:
         super().__init__(spec, UVCBackend)
+        assert isinstance(self.backend, UVCBackend)
         self.exposure_controls = [
             self.backend._uvc_capture.add_vendor_control({
                 "display_name": f"Absolute Exposure Time {i}",
@@ -183,7 +186,9 @@ class EyeCameraUVC(EyeCamera):
         }
 
     def _get_eye_exposure(self, eye_idx: int) -> int | None:
-        return self.exposure_controls[eye_idx].value
+        val = self.exposure_controls[eye_idx].value
+        assert isinstance(val, int) or val is None
+        return val
 
     def _set_eye_exposure(self, eye_idx: int, exposure_time: int) -> None:
         self.exposure_controls[eye_idx].value = exposure_time
@@ -194,7 +199,9 @@ class EyeCameraV4l2(EyeCamera):
         super().__init__(spec, V4l2Backend)
 
     def _get_eye_exposure(self, eye_idx: int) -> int | None:
+        assert isinstance(self.backend, V4l2Backend)
         return uvc_utils.get_eye_exposure(self.backend._fd, eye_idx)
 
     def _set_eye_exposure(self, eye_idx: int, exposure_time: int) -> None:
+        assert isinstance(self.backend, V4l2Backend)
         uvc_utils.set_eye_exposure(self.backend._fd, eye_idx, exposure_time)

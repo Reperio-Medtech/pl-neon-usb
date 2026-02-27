@@ -20,16 +20,19 @@ dependencies = [
     "numpy<2",
     "opencv-python>=4.11.0.86",
     "pupil-labs-neon-recording",
-    "pupil-labs-uvc>=1.0.0",
+    "pupil-labs-neon-usb-imu>=1.0.0",
+    "pupil-labs-uvc",
     "pyusb>=1.3.1",
 ]
+
+[project.optional-dependencies]
+examples = ["tqdm>=4.67.1","matplotlib"]
 
 [project.urls]
 Homepage = "https://pupil-labs.github.io/pl-neon-usb"
 Documentation = "https://pupil-labs.github.io/pl-neon-usb"
 Repository = "https://github.com/pupil-labs/pl-neon-usb"
 Issues = "https://github.com/pupil-labs/pl-neon-usb/issues"
-
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
@@ -62,9 +65,6 @@ dev = [
     # YORE: EOL 3.10: Remove line.
     "tomli>=2.0; python_version < '3.11'",
 ]
-examples = [
-    "tqdm>=4.67.1",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -81,10 +81,13 @@ source = ["pupil_labs"]
 DEP001 = ["pupil_labs", "cv2"]
 DEP002 = ["opencv-python"]
 DEP003 = ["pupil_labs", "typing_extensions"]
-DEP004 = ["tqdm"]
+DEP004 = ["tqdm", "mkdocs"]
 
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pupil_labs"]
+
+[tool.uv.sources]
+pupil-labs-uvc = { git = "https://github.com/pupil-labs/pyuvc", rev = "neon-eyes-fix" }

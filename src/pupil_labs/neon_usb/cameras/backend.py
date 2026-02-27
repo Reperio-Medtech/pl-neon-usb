@@ -69,7 +69,6 @@ class UVCBackend(CameraBackend):
             ):
                 mode_matched = True
                 capture.frame_mode = mode
-                self.last_frame_timestamp: float = uvc.get_time_monotonic()
                 self._uvc_capture = capture
 
                 break
@@ -144,7 +143,9 @@ class V4l2Backend(CameraBackend):
             raise CameraNotFoundError(self.spec.name)
 
     def get_frame(self) -> Frame:
-        buffer, time_ns = self.stream.get_frame()
+        frame = self.stream.get_frame()
+        assert frame is not None, "Failed to get frame from stream!"
+        buffer, time_ns = frame
         if buffer is None:
             raise TimeoutError
 
